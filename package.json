@@ -10,7 +10,7 @@
     "build": "vinext build",
     "test:pricing": "node --experimental-strip-types --test lib/pricing.test.ts",
     "start": "vinext start",
-    "lint": "oxlint",
+    "lint": "oxlint app/page.tsx lib/pricing.ts types/lucide-react.d.ts",
     "format": "oxfmt"
   },
   "dependencies": {
@@ -54,3 +54,4 @@
   },
   "type": "module"
 }
+
