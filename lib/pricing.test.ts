@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { calculatePrice, calculateQuoteTotals, DEFAULT_SETTINGS, normalizeMaterial, normalizeQuote, normalizeSettings, type Material, type Procedure, type PricingSettings, type QuoteItem } from './pricing.ts';
+import { calculateFinancialSummary, calculatePrice, calculateQuoteTotals, DEFAULT_SETTINGS, normalizeFinancialEntry, normalizeMaterial, normalizeQuote, normalizeSettings, type FinancialEntry, type Material, type Procedure, type PricingSettings, type QuoteItem } from './pricing.ts';
 
 const materials: Material[] = [
   normalizeMaterial({ id: 'resina', name: 'Resina', category: 'Restauração', unit: 'unidade', unitCost: 18.5, updatedAt: '2026-08-28T10:00:00.000Z' }),
@@ -71,5 +71,19 @@ test('normaliza orçamento legado sem substituir preço salvo', () => {
   assert.equal(quote.total, 380);
   assert.equal(quote.discountMode, 'percentual');
   assert.equal(quote.items[0].unitPrice, 400);
+});
+test('filtra entradas financeiras pelo período e calcula resultado', () => {
+  const entries: FinancialEntry[] = [normalizeFinancialEntry({ id: 'a', clientName: 'Ana', procedureName: 'Limpeza', date: '2026-08-10', amount: 500, cost: 120 }), normalizeFinancialEntry({ id: 'b', clientName: 'Bia', procedureName: 'Restauração', date: '2026-09-01', amount: 300, cost: 80 }), normalizeFinancialEntry({ id: 'c', clientName: 'Caio', procedureName: 'Clareamento', date: '2026-09-02', amount: 400, cost: 100 })];
+  const result = calculateFinancialSummary(entries, '2026-09-01', '2026-09-30');
+  assert.equal(result.entries.length, 2);
+  assert.equal(result.revenue, 700);
+  assert.equal(result.cost, 180);
+  assert.equal(result.profit, 520);
+  assert.equal(result.margin, 520 / 700 * 100);
+});
+test('normaliza entrada financeira inválida sem NaN ou Infinity', () => {
+  const entry = normalizeFinancialEntry({ amount: Number.NaN, cost: Number.POSITIVE_INFINITY });
+  assert.equal(entry.amount, 0);
+  assert.equal(entry.cost, 0);
 });
 

@@ -1,7 +1,7 @@
 export type ProcedureMaterial = { materialId: string; quantity: number };
 export type MaterialPriceHistory = { id: string; materialId: string; previousPackagePrice: number; newPackagePrice: number; updatedAt: string; supplier?: string };
 export type Material = { id: string; name: string; category: string; purchaseUnit: string; packageQuantity: number; consumptionUnit: string; packagePrice: number; baseUnitCost: number; supplier: string; updatedAt: string; active: boolean; priceHistory: MaterialPriceHistory[] };
-export type Procedure = { id: string; name: string; category: string; durationMinutes: number; otherVariableCost: number; materials: ProcedureMaterial[] };
+export type Procedure = { id: string; name: string; category: string; durationMinutes: number; otherVariableCost: number; materials: ProcedureMaterial[]; active?: boolean };
 export type FixedCost = { id: string; name: string; category: string; monthlyValue: number; active: boolean };
 export type BrandingSettings = { appName: string; subtitle: string; clinicName: string; dentistName: string; logoText: string; logoSymbol: string; logoDataUrl?: string; primaryColor: string; accentColor: string };
 export type PricingSettings = { monthlyFixedCosts: number; monthlyClinicalHours: number; taxRate: number; paymentFeeRate: number; defaultMargin: number; fixedCosts: FixedCost[]; branding: BrandingSettings; theme: 'light' | 'dark' };
@@ -11,6 +11,7 @@ export type QuoteItem = { id: string; procedureId: string; procedureName: string
 export type Quote = { id: string; clientName: string; items: QuoteItem[]; discount: number; discountMode: QuoteDiscountMode; discountAmount: number; subtotal: number; total: number; costTotal: number; taxesAndFees: number; profit: number; profitMargin: number; taxRate: number; paymentFeeRate: number; defaultMargin: number; createdAt: string; updatedAt: string };
 export type QuoteTotals = { subtotal: number; discountAmount: number; total: number; costTotal: number; taxesAndFees: number; profit: number; profitMargin: number; validDiscount: boolean };
 export type Calculation = { variableCost: number; fixedAllocation: number; realCost: number; minimumPrice: number; recommendedPrice: number; discountedPrice: number; taxesAndFees: number; profit: number; profitMargin: number; margin: number; taxRate: number; feeRate: number };
+export type FinancialEntry = { id: string; clientName: string; procedureName: string; date: string; amount: number; cost: number; notes: string };
 
 export const MATERIAL_CATEGORIES = ['Anestésico', 'Descartável', 'Implantodontia', 'Moldagem', 'Ortodontia', 'Restauração', 'Clareamento', 'Outro'];
 export const MATERIAL_UNITS = ['unidade', 'par', 'kit', 'caixa', 'ml', 'g', 'm', 'pote'];
@@ -35,7 +36,7 @@ export function normalizeMaterial(raw: Partial<Material> & { unit?: string; unit
 }
 
 export function normalizeProcedure(raw: Partial<Procedure>): Procedure {
-  return { id: raw.id || `procedure-${Date.now()}`, name: String(raw.name || '').trim(), category: raw.category || 'Outro', durationMinutes: Math.max(1, safeNumber(raw.durationMinutes, 1)), otherVariableCost: Math.max(0, safeNumber(raw.otherVariableCost, 0)), materials: Array.isArray(raw.materials) ? raw.materials.map((item) => ({ materialId: item.materialId, quantity: Math.max(0, safeNumber(item.quantity, 0)) })).filter((item) => item.materialId) : [] };
+  return { id: raw.id || `procedure-${Date.now()}`, name: String(raw.name || '').trim(), category: raw.category || 'Outro', durationMinutes: Math.max(1, safeNumber(raw.durationMinutes, 1)), otherVariableCost: Math.max(0, safeNumber(raw.otherVariableCost, 0)), materials: Array.isArray(raw.materials) ? raw.materials.map((item) => ({ materialId: item.materialId, quantity: Math.max(0, safeNumber(item.quantity, 0)) })).filter((item) => item.materialId) : [], active: raw.active !== false };
 }
 
 export function normalizeSettings(raw: Partial<PricingSettings> = {}): PricingSettings {
@@ -74,6 +75,29 @@ export function calculateQuoteTotals(items: QuoteItem[], discount = 0, discountM
   const taxesAndFees = total * (Math.max(0, safeNumber(taxRate)) + Math.max(0, safeNumber(paymentFeeRate))) / 100;
   const profit = total - taxesAndFees - costTotal;
   return { subtotal, discountAmount, total, costTotal, taxesAndFees, profit, profitMargin: total ? profit / total * 100 : 0, validDiscount };
+}
+
+export function normalizeFinancialEntry(raw: Partial<FinancialEntry>): FinancialEntry {
+  const date = typeof raw.date === 'string' && !Number.isNaN(new Date(raw.date).getTime()) ? raw.date : new Date().toISOString().slice(0, 10);
+  return { id: raw.id || `entry-${Date.now()}`, clientName: String(raw.clientName || '').trim(), procedureName: String(raw.procedureName || '').trim(), date: dateInputValue(date), amount: Math.max(0, safeNumber(raw.amount)), cost: Math.max(0, safeNumber(raw.cost)), notes: String(raw.notes || '').trim() };
+}
+
+const dateInputValue = (value: string) => {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString().slice(0, 10) : parsed.toISOString().slice(0, 10);
+};
+
+export function calculateFinancialSummary(entries: FinancialEntry[], start: string, end: string) {
+  const startTime = new Date(`${start}T00:00:00`).getTime();
+  const endTime = new Date(`${end}T23:59:59.999`).getTime();
+  const filtered = entries.filter((entry) => {
+    const time = new Date(`${entry.date}T12:00:00`).getTime();
+    return Number.isFinite(time) && time >= startTime && time <= endTime;
+  });
+  const revenue = filtered.reduce((sum, entry) => sum + Math.max(0, safeNumber(entry.amount)), 0);
+  const cost = filtered.reduce((sum, entry) => sum + Math.max(0, safeNumber(entry.cost)), 0);
+  const profit = revenue - cost;
+  return { entries: filtered, revenue, cost, profit, margin: revenue ? profit / revenue * 100 : 0 };
 }
 
 export function normalizeQuote(raw: Partial<Quote> & { discountMode?: QuoteDiscountMode }, fallbackTaxRate = 0, fallbackPaymentFeeRate = 0, fallbackMargin = 0): Quote {
