@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: ftg-odonto
+    name: ftg.odontologia
     runtime: node
     plan: free
     buildCommand: npm ci --include=dev && npm run build

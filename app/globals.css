@@ -97,3 +97,29 @@
 @media (max-width: 1050px) { .topbar-context { max-width: 42vw; } }
 @media (max-width: 720px) { .main-area { width: 100%; } .topbar-context { max-width: none; } }
 
+/* Resultado do simulador acompanha a paleta clara; o tema escuro permanece azul-petróleo. */
+.result-card { background: #fff0f4; color: var(--navy); border: 1px solid #f4d7e2; box-shadow: 0 9px 22px #bd587f18; }
+.result-card .result-top h2 { color: var(--navy); }
+.result-card .result-top p:not(.eyebrow) { color: #997287; }
+.result-card .result-check { background: #f2c3d2; color: #a6436c; }
+.result-card .main-result { border-color: #e9cbd7; }
+.result-card .main-result span, .result-card .main-result small { color: #997287; }
+.result-card .main-result strong { color: var(--navy); }
+.result-card .result-mini-grid div { border-color: #e9cbd7; }
+.result-card .result-mini-grid span { color: #997287; }
+.result-card .result-mini-grid strong { color: var(--navy); }
+.result-card .result-profit { color: #3c8b69 !important; }
+.result-card .result-breakdown { background: #ffffffaa; }
+.result-card .result-breakdown div { color: #8e6578; }
+.result-card .result-breakdown strong { color: var(--navy); }
+.result-card .result-breakdown .breakdown-total { border-color: #e9cbd7; color: #8e6578; }
+.result-card .result-breakdown .breakdown-total strong { color: var(--teal); }
+.theme-dark .result-card { background: #132b36; color: #fff; border: 0; box-shadow: 0 9px 22px #173c4230; }
+.theme-dark .result-card .result-top h2, .theme-dark .result-card .main-result strong, .theme-dark .result-card .result-mini-grid strong, .theme-dark .result-card .result-breakdown strong { color: #fff; }
+.theme-dark .result-card .result-top p:not(.eyebrow), .theme-dark .result-card .main-result span, .theme-dark .result-card .main-result small, .theme-dark .result-card .result-mini-grid span, .theme-dark .result-card .result-breakdown div, .theme-dark .result-card .result-breakdown .breakdown-total { color: #9dbab3; }
+.theme-dark .result-card .result-check { background: #2b7069; color: #a6dfc1; }
+.theme-dark .result-card .main-result, .theme-dark .result-card .result-mini-grid div, .theme-dark .result-card .result-breakdown .breakdown-total { border-color: #ffffff20; }
+.theme-dark .result-card .result-profit { color: #92ddb1 !important; }
+.theme-dark .result-card .result-breakdown { background: #ffffff0d; }
+.theme-dark .result-card .result-breakdown .breakdown-total strong { color: #f2ca6c; }
+
