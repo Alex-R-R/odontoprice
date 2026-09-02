@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: odontoprice
+    name: ftg-odonto
     runtime: node
     plan: free
     buildCommand: npm ci --include=dev && npm run build
@@ -9,3 +9,4 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22.13.0
+

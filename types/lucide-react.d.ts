@@ -9,6 +9,7 @@ declare module 'lucide-react' {
   export const ChevronRight: Icon;
   export const CircleDollarSign: Icon;
   export const Clock3: Icon;
+  export const Copy: Icon;
   export const Download: Icon;
   export const FileDown: Icon;
   export const History: Icon;

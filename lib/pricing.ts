@@ -3,22 +3,25 @@ export type MaterialPriceHistory = { id: string; materialId: string; previousPac
 export type Material = { id: string; name: string; category: string; purchaseUnit: string; packageQuantity: number; consumptionUnit: string; packagePrice: number; baseUnitCost: number; supplier: string; updatedAt: string; active: boolean; priceHistory: MaterialPriceHistory[] };
 export type Procedure = { id: string; name: string; category: string; durationMinutes: number; otherVariableCost: number; materials: ProcedureMaterial[] };
 export type FixedCost = { id: string; name: string; category: string; monthlyValue: number; active: boolean };
-export type BrandingSettings = { appName: string; clinicName: string; dentistName: string; logoText: string; logoSymbol: string; logoDataUrl?: string; primaryColor: string; accentColor: string };
+export type BrandingSettings = { appName: string; subtitle: string; clinicName: string; dentistName: string; logoText: string; logoSymbol: string; logoDataUrl?: string; primaryColor: string; accentColor: string };
 export type PricingSettings = { monthlyFixedCosts: number; monthlyClinicalHours: number; taxRate: number; paymentFeeRate: number; defaultMargin: number; fixedCosts: FixedCost[]; branding: BrandingSettings; theme: 'light' | 'dark' };
 export type HistoryEntry = { id: string; action: string; detail: string; createdAt: string };
-export type QuoteItem = { id: string; procedureId: string; procedureName: string; quantity: number; unitPrice: number };
-export type Quote = { id: string; clientName: string; items: QuoteItem[]; discount: number; total: number; createdAt: string };
+export type QuoteDiscountMode = 'percentual' | 'percent' | 'fixed';
+export type QuoteItem = { id: string; procedureId: string; procedureName: string; quantity: number; unitPrice: number; unitCost?: number; durationMinutes?: number };
+export type Quote = { id: string; clientName: string; items: QuoteItem[]; discount: number; discountMode: QuoteDiscountMode; discountAmount: number; subtotal: number; total: number; costTotal: number; taxesAndFees: number; profit: number; profitMargin: number; taxRate: number; paymentFeeRate: number; defaultMargin: number; createdAt: string; updatedAt: string };
+export type QuoteTotals = { subtotal: number; discountAmount: number; total: number; costTotal: number; taxesAndFees: number; profit: number; profitMargin: number; validDiscount: boolean };
 export type Calculation = { variableCost: number; fixedAllocation: number; realCost: number; minimumPrice: number; recommendedPrice: number; discountedPrice: number; taxesAndFees: number; profit: number; profitMargin: number; margin: number; taxRate: number; feeRate: number };
 
 export const MATERIAL_CATEGORIES = ['Anestésico', 'Descartável', 'Implantodontia', 'Moldagem', 'Ortodontia', 'Restauração', 'Clareamento', 'Outro'];
 export const MATERIAL_UNITS = ['unidade', 'par', 'kit', 'caixa', 'ml', 'g', 'm', 'pote'];
 export const FIXED_COST_CATEGORIES = ['Estrutura', 'Pessoal', 'Tecnologia', 'Administrativo', 'Marketing', 'Outros'];
-export const DEFAULT_BRANDING: BrandingSettings = { appName: 'OdontoPrice', clinicName: 'Minha clínica odontológica', dentistName: 'Dra. Fernanda T. Gonçalves', logoText: 'OP', logoSymbol: '✦', primaryColor: '#bd587f', accentColor: '#edabc0' };
+export const DEFAULT_BRANDING: BrandingSettings = { appName: 'FTG Odontologia', subtitle: 'Gestão & Precificação Odontológica', clinicName: 'FTG Odontologia', dentistName: 'Dra. Fernanda T. Gonçalves', logoText: 'FTG', logoSymbol: '✦', primaryColor: '#bd587f', accentColor: '#edabc0' };
 export const DEFAULT_SETTINGS: PricingSettings = { monthlyFixedCosts: 0, monthlyClinicalHours: 120, taxRate: 6, paymentFeeRate: 2, defaultMargin: 30, fixedCosts: [], branding: DEFAULT_BRANDING, theme: 'light' };
 export const DEFAULT_MATERIALS: Material[] = [];
 export const DEFAULT_PROCEDURES: Procedure[] = [];
 
 export const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number.isFinite(value) ? value : 0);
+export const formatPercent = (value: number) => `${(Number.isFinite(value) ? value : 0).toFixed(2).replace('.', ',')}%`;
 export const formatDate = (value: string) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(date).replace('.', ''); };
 export const normalizeText = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 export const safeNumber = (value: unknown, fallback = 0) => { const parsed = typeof value === 'number' ? value : Number(value); return Number.isFinite(parsed) ? parsed : fallback; };
@@ -38,7 +41,8 @@ export function normalizeProcedure(raw: Partial<Procedure>): Procedure {
 export function normalizeSettings(raw: Partial<PricingSettings> = {}): PricingSettings {
   const legacyFixed = Math.max(0, safeNumber(raw.monthlyFixedCosts, 0));
   const fixedCosts = Array.isArray(raw.fixedCosts) ? raw.fixedCosts.map((item) => ({ id: item.id || `fixed-${Date.now()}`, name: String(item.name || 'Custo fixo').trim(), category: item.category || 'Outros', monthlyValue: Math.max(0, safeNumber(item.monthlyValue, 0)), active: item.active !== false })) : (legacyFixed > 0 ? [{ id: 'legacy-fixed-cost', name: 'Custos fixos gerais', category: 'Estrutura', monthlyValue: legacyFixed, active: true }] : []);
-  const branding = { ...DEFAULT_BRANDING, ...raw.branding };
+  const brandingSource: Partial<BrandingSettings> = raw.branding || {};
+  const branding = { ...DEFAULT_BRANDING, ...brandingSource, appName: brandingSource.appName === 'OdontoPrice' ? DEFAULT_BRANDING.appName : brandingSource.appName || DEFAULT_BRANDING.appName, logoText: brandingSource.logoText === 'OP' ? DEFAULT_BRANDING.logoText : brandingSource.logoText || DEFAULT_BRANDING.logoText };
   return { monthlyFixedCosts: fixedCosts.reduce((sum, item) => sum + (item.active ? item.monthlyValue : 0), 0), monthlyClinicalHours: Math.max(1, safeNumber(raw.monthlyClinicalHours, DEFAULT_SETTINGS.monthlyClinicalHours)), taxRate: Math.max(0, safeNumber(raw.taxRate, DEFAULT_SETTINGS.taxRate)), paymentFeeRate: Math.max(0, safeNumber(raw.paymentFeeRate, DEFAULT_SETTINGS.paymentFeeRate)), defaultMargin: Math.max(0, safeNumber(raw.defaultMargin, DEFAULT_SETTINGS.defaultMargin)), fixedCosts, branding, theme: raw.theme === 'dark' ? 'dark' : 'light' };
 }
 
@@ -58,5 +62,27 @@ export function calculatePrice(procedure: Procedure, settings: PricingSettings, 
   const taxesAndFees = discountedPrice * (taxRate + feeRate);
   const profit = discountedPrice - taxesAndFees - realCost;
   return { variableCost, fixedAllocation, realCost, minimumPrice, recommendedPrice, discountedPrice, taxesAndFees, profit, profitMargin: discountedPrice ? (profit / discountedPrice) * 100 : 0, margin: Math.max(0, safeNumber(margin)), taxRate: taxRate * 100, feeRate: feeRate * 100 };
+}
+
+export function calculateQuoteTotals(items: QuoteItem[], discount = 0, discountMode: QuoteDiscountMode = 'percent', taxRate = 0, paymentFeeRate = 0): QuoteTotals {
+  const subtotal = items.reduce((sum, item) => sum + Math.max(0, safeNumber(item.quantity)) * Math.max(0, safeNumber(item.unitPrice)), 0);
+  const requestedDiscount = Math.max(0, safeNumber(discount));
+  const discountAmount = discountMode === 'fixed' ? Math.min(subtotal, requestedDiscount) : subtotal * Math.min(100, requestedDiscount) / 100;
+  const validDiscount = discountMode === 'fixed' ? requestedDiscount <= subtotal + 0.000001 : requestedDiscount <= 100;
+  const total = Math.max(0, subtotal - discountAmount);
+  const costTotal = items.reduce((sum, item) => sum + Math.max(0, safeNumber(item.quantity)) * Math.max(0, safeNumber(item.unitCost)), 0);
+  const taxesAndFees = total * (Math.max(0, safeNumber(taxRate)) + Math.max(0, safeNumber(paymentFeeRate))) / 100;
+  const profit = total - taxesAndFees - costTotal;
+  return { subtotal, discountAmount, total, costTotal, taxesAndFees, profit, profitMargin: total ? profit / total * 100 : 0, validDiscount };
+}
+
+export function normalizeQuote(raw: Partial<Quote> & { discountMode?: QuoteDiscountMode }, fallbackTaxRate = 0, fallbackPaymentFeeRate = 0, fallbackMargin = 0): Quote {
+  const items = Array.isArray(raw.items) ? raw.items.map((item) => ({ id: item.id || `quote-item-${Date.now()}`, procedureId: item.procedureId || '', procedureName: String(item.procedureName || 'Procedimento'), quantity: Math.max(0, safeNumber(item.quantity, 1)), unitPrice: Math.max(0, safeNumber(item.unitPrice)), unitCost: Math.max(0, safeNumber(item.unitCost)), durationMinutes: Math.max(0, safeNumber(item.durationMinutes, 0)) })) : [];
+  const discountMode = raw.discountMode === 'fixed' ? 'fixed' : 'percentual';
+  const taxRate = Math.max(0, safeNumber(raw.taxRate, fallbackTaxRate));
+  const paymentFeeRate = Math.max(0, safeNumber(raw.paymentFeeRate, fallbackPaymentFeeRate));
+  const totals = calculateQuoteTotals(items, raw.discount, discountMode, taxRate, paymentFeeRate);
+  const legacyTotal = safeNumber(raw.total, totals.total);
+  return { id: raw.id || `quote-${Date.now()}`, clientName: String(raw.clientName || '').trim(), items, discount: Math.max(0, safeNumber(raw.discount)), discountMode, discountAmount: Number.isFinite(raw.discountAmount) ? Math.max(0, safeNumber(raw.discountAmount)) : totals.discountAmount, subtotal: Number.isFinite(raw.subtotal) ? Math.max(0, safeNumber(raw.subtotal)) : totals.subtotal, total: Number.isFinite(raw.total) ? Math.max(0, legacyTotal) : totals.total, costTotal: Number.isFinite(raw.costTotal) ? Math.max(0, safeNumber(raw.costTotal)) : totals.costTotal, taxesAndFees: Number.isFinite(raw.taxesAndFees) ? Math.max(0, safeNumber(raw.taxesAndFees)) : totals.taxesAndFees, profit: Number.isFinite(raw.profit) ? safeNumber(raw.profit) : totals.profit, profitMargin: Number.isFinite(raw.profitMargin) ? safeNumber(raw.profitMargin) : totals.profitMargin, taxRate, paymentFeeRate, defaultMargin: Math.max(0, safeNumber(raw.defaultMargin, fallbackMargin)), createdAt: raw.createdAt || new Date().toISOString(), updatedAt: raw.updatedAt || raw.createdAt || new Date().toISOString() };
 }
 

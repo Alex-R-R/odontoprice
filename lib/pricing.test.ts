@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { calculatePrice, DEFAULT_SETTINGS, normalizeMaterial, normalizeSettings, type Material, type Procedure, type PricingSettings } from './pricing.ts';
+import { calculatePrice, calculateQuoteTotals, DEFAULT_SETTINGS, normalizeMaterial, normalizeQuote, normalizeSettings, type Material, type Procedure, type PricingSettings, type QuoteItem } from './pricing.ts';
 
 const materials: Material[] = [
   normalizeMaterial({ id: 'resina', name: 'Resina', category: 'Restauração', unit: 'unidade', unitCost: 18.5, updatedAt: '2026-08-28T10:00:00.000Z' }),
@@ -45,5 +45,31 @@ test('aceita procedimento sem materiais e quantidade fracionada', () => {
   assert.equal(calculatePrice(noMaterial, settings, materials).variableCost, 10);
   const fractional = { ...procedure, materials: [{ materialId: 'resina', quantity: 0.5 }] };
   assert.ok(calculatePrice(fractional, settings, materials).variableCost < 20);
+});
+test('calcula desconto percentual e preserva custo, impostos e lucro', () => {
+  const items: QuoteItem[] = [{ id: 'item', procedureId: 'restauracao', procedureName: 'Restauração', quantity: 2, unitPrice: 500, unitCost: 150, durationMinutes: 60 }];
+  const result = calculateQuoteTotals(items, 10, 'percentual', 6, 2);
+  assert.equal(result.subtotal, 1000);
+  assert.equal(result.discountAmount, 100);
+  assert.equal(result.total, 900);
+  assert.equal(result.costTotal, 300);
+  assert.equal(result.taxesAndFees, 72);
+  assert.equal(result.profit, 528);
+  assert.equal(result.validDiscount, true);
+});
+test('calcula desconto fixo e bloqueia desconto acima do subtotal', () => {
+  const items: QuoteItem[] = [{ id: 'item', procedureId: 'clareamento', procedureName: 'Clareamento', quantity: 1, unitPrice: 750, unitCost: 200, durationMinutes: 45 }];
+  const fixed = calculateQuoteTotals(items, 100, 'fixed', 0, 0);
+  const invalid = calculateQuoteTotals(items, 800, 'fixed', 0, 0);
+  assert.equal(fixed.discountAmount, 100);
+  assert.equal(fixed.total, 650);
+  assert.equal(invalid.total, 0);
+  assert.equal(invalid.validDiscount, false);
+});
+test('normaliza orçamento legado sem substituir preço salvo', () => {
+  const quote = normalizeQuote({ id: 'legacy', clientName: 'Paciente', items: [{ id: 'item', procedureId: 'p', procedureName: 'Serviço', quantity: 1, unitPrice: 400 }], discount: 5, total: 380, createdAt: '2026-08-01T10:00:00.000Z' }, 6, 2, 30);
+  assert.equal(quote.total, 380);
+  assert.equal(quote.discountMode, 'percentual');
+  assert.equal(quote.items[0].unitPrice, 400);
 });
 
