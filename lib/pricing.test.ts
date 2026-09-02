@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { calculateFinancialSummary, calculatePrice, calculateQuoteTotals, DEFAULT_SETTINGS, normalizeFinancialEntry, normalizeMaterial, normalizeQuote, normalizeSettings, type FinancialEntry, type Material, type Procedure, type PricingSettings, type QuoteItem } from './pricing.ts';
+import { calculateFinancialSummary, calculatePrice, calculateQuoteTotals, DEFAULT_BRANDING, DEFAULT_SETTINGS, normalizeFinancialEntry, normalizeMaterial, normalizeQuote, normalizeSettings, type FinancialEntry, type Material, type Procedure, type PricingSettings, type QuoteItem } from './pricing.ts';
 
 const materials: Material[] = [
   normalizeMaterial({ id: 'resina', name: 'Resina', category: 'Restauração', unit: 'unidade', unitCost: 18.5, updatedAt: '2026-08-28T10:00:00.000Z' }),
@@ -85,5 +85,8 @@ test('normaliza entrada financeira inválida sem NaN ou Infinity', () => {
   const entry = normalizeFinancialEntry({ amount: Number.NaN, cost: Number.POSITIVE_INFINITY });
   assert.equal(entry.amount, 0);
   assert.equal(entry.cost, 0);
+});
+test('migra marca antiga persistida para FTG Odontologia', () => {
+  assert.equal(normalizeSettings({ branding: { ...DEFAULT_BRANDING, appName: 'Precificação' } }).branding.appName, 'FTG Odontologia');
 });
 
