@@ -97,6 +97,14 @@
 @media (max-width: 1050px) { .topbar-context { max-width: 42vw; } }
 @media (max-width: 720px) { .main-area { width: 100%; } .topbar-context { max-width: none; } }
 
+/* Cabeçalho estável e fundo odontológico discreto, sem deslocar o conteúdo. */
+.main-area { position: relative; background-color: var(--background); background-image: radial-gradient(circle at 94% 8%, #edabc026 0, #edabc000 30%), radial-gradient(circle at 8% 92%, #bd587f12 0, #bd587f00 26%); }
+.topbar { min-width: 0; height: auto; min-height: 74px; position: relative; z-index: 2; }
+.topbar-context { display: grid; align-content: center; gap: 4px; }
+.topbar-context span, .topbar-context strong { display: block; line-height: 1.25; }
+.content-wrap { position: relative; z-index: 1; }
+.theme-dark .main-area { background-image: radial-gradient(circle at 94% 8%, #62c7ba1c 0, #62c7ba00 30%), radial-gradient(circle at 8% 92%, #328e8a16 0, #328e8a00 26%); }
+
 /* Resultado do simulador acompanha a paleta clara; o tema escuro permanece azul-petróleo. */
 .result-card { background: #fff0f4; color: var(--navy); border: 1px solid #f4d7e2; box-shadow: 0 9px 22px #bd587f18; }
 .result-card .result-top h2 { color: var(--navy); }
