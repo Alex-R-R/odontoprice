@@ -8,8 +8,10 @@ export type PricingSettings = { monthlyFixedCosts: number; monthlyClinicalHours:
 export type HistoryEntry = { id: string; action: string; detail: string; createdAt: string };
 export type QuoteDiscountMode = 'percentual' | 'percent' | 'fixed';
 export type QuoteItem = { id: string; procedureId: string; procedureName: string; quantity: number; unitPrice: number; unitCost?: number; durationMinutes?: number };
-export type Quote = { id: string; clientName: string; items: QuoteItem[]; discount: number; discountMode: QuoteDiscountMode; discountAmount: number; subtotal: number; total: number; costTotal: number; taxesAndFees: number; profit: number; profitMargin: number; taxRate: number; paymentFeeRate: number; defaultMargin: number; createdAt: string; updatedAt: string };
-export type QuoteTotals = { subtotal: number; discountAmount: number; total: number; costTotal: number; taxesAndFees: number; profit: number; profitMargin: number; validDiscount: boolean };
+export type OtherProfessional = { id: string; name: string; area: string; service: string; amount: number; active: boolean; updatedAt: string };
+export type QuoteProfessionalItem = { id: string; professionalId: string; professionalName: string; area: string; service: string; amount: number };
+export type Quote = { id: string; clientName: string; items: QuoteItem[]; professionalItems: QuoteProfessionalItem[]; discount: number; discountMode: QuoteDiscountMode; discountAmount: number; subtotal: number; total: number; costTotal: number; taxesAndFees: number; profit: number; profitMargin: number; taxRate: number; paymentFeeRate: number; defaultMargin: number; createdAt: string; updatedAt: string };
+export type QuoteTotals = { subtotal: number; professionalTotal: number; discountAmount: number; total: number; costTotal: number; taxesAndFees: number; profit: number; profitMargin: number; validDiscount: boolean };
 export type Calculation = { variableCost: number; fixedAllocation: number; realCost: number; minimumPrice: number; recommendedPrice: number; discountedPrice: number; taxesAndFees: number; profit: number; profitMargin: number; margin: number; taxRate: number; feeRate: number };
 export type FinancialEntry = { id: string; clientName: string; procedureName: string; date: string; amount: number; cost: number; notes: string };
 
@@ -39,6 +41,10 @@ export function normalizeProcedure(raw: Partial<Procedure>): Procedure {
   return { id: raw.id || `procedure-${Date.now()}`, name: String(raw.name || '').trim(), category: raw.category || 'Outro', durationMinutes: Math.max(1, safeNumber(raw.durationMinutes, 1)), otherVariableCost: Math.max(0, safeNumber(raw.otherVariableCost, 0)), materials: Array.isArray(raw.materials) ? raw.materials.map((item) => ({ materialId: item.materialId, quantity: Math.max(0, safeNumber(item.quantity, 0)) })).filter((item) => item.materialId) : [], active: raw.active !== false };
 }
 
+export function normalizeOtherProfessional(raw: Partial<OtherProfessional>): OtherProfessional {
+  return { id: raw.id || `professional-${Date.now()}`, name: String(raw.name || '').trim(), area: String(raw.area || '').trim(), service: String(raw.service || '').trim(), amount: Math.max(0, safeNumber(raw.amount, 0)), active: raw.active !== false, updatedAt: raw.updatedAt || new Date().toISOString() };
+}
+
 export function normalizeSettings(raw: Partial<PricingSettings> = {}): PricingSettings {
   const legacyFixed = Math.max(0, safeNumber(raw.monthlyFixedCosts, 0));
   const fixedCosts = Array.isArray(raw.fixedCosts) ? raw.fixedCosts.map((item) => ({ id: item.id || `fixed-${Date.now()}`, name: String(item.name || 'Custo fixo').trim(), category: item.category || 'Outros', monthlyValue: Math.max(0, safeNumber(item.monthlyValue, 0)), active: item.active !== false })) : (legacyFixed > 0 ? [{ id: 'legacy-fixed-cost', name: 'Custos fixos gerais', category: 'Estrutura', monthlyValue: legacyFixed, active: true }] : []);
@@ -66,16 +72,17 @@ export function calculatePrice(procedure: Procedure, settings: PricingSettings, 
   return { variableCost, fixedAllocation, realCost, minimumPrice, recommendedPrice, discountedPrice, taxesAndFees, profit, profitMargin: discountedPrice ? (profit / discountedPrice) * 100 : 0, margin: Math.max(0, safeNumber(margin)), taxRate: taxRate * 100, feeRate: feeRate * 100 };
 }
 
-export function calculateQuoteTotals(items: QuoteItem[], discount = 0, discountMode: QuoteDiscountMode = 'percent', taxRate = 0, paymentFeeRate = 0): QuoteTotals {
-  const subtotal = items.reduce((sum, item) => sum + Math.max(0, safeNumber(item.quantity)) * Math.max(0, safeNumber(item.unitPrice)), 0);
+export function calculateQuoteTotals(items: QuoteItem[], discount = 0, discountMode: QuoteDiscountMode = 'percent', taxRate = 0, paymentFeeRate = 0, professionalItems: QuoteProfessionalItem[] = []): QuoteTotals {
+  const professionalTotal = professionalItems.reduce((sum, item) => sum + Math.max(0, safeNumber(item.amount)), 0);
+  const subtotal = items.reduce((sum, item) => sum + Math.max(0, safeNumber(item.quantity)) * Math.max(0, safeNumber(item.unitPrice)), 0) + professionalTotal;
   const requestedDiscount = Math.max(0, safeNumber(discount));
   const discountAmount = discountMode === 'fixed' ? Math.min(subtotal, requestedDiscount) : subtotal * Math.min(100, requestedDiscount) / 100;
   const validDiscount = discountMode === 'fixed' ? requestedDiscount <= subtotal + 0.000001 : requestedDiscount <= 100;
   const total = Math.max(0, subtotal - discountAmount);
-  const costTotal = items.reduce((sum, item) => sum + Math.max(0, safeNumber(item.quantity)) * Math.max(0, safeNumber(item.unitCost)), 0);
+  const costTotal = items.reduce((sum, item) => sum + Math.max(0, safeNumber(item.quantity)) * Math.max(0, safeNumber(item.unitCost)), 0) + professionalTotal;
   const taxesAndFees = total * (Math.max(0, safeNumber(taxRate)) + Math.max(0, safeNumber(paymentFeeRate))) / 100;
   const profit = total - taxesAndFees - costTotal;
-  return { subtotal, discountAmount, total, costTotal, taxesAndFees, profit, profitMargin: total ? profit / total * 100 : 0, validDiscount };
+  return { subtotal, professionalTotal, discountAmount, total, costTotal, taxesAndFees, profit, profitMargin: total ? profit / total * 100 : 0, validDiscount };
 }
 
 export function normalizeFinancialEntry(raw: Partial<FinancialEntry>): FinancialEntry {
@@ -103,11 +110,12 @@ export function calculateFinancialSummary(entries: FinancialEntry[], start: stri
 
 export function normalizeQuote(raw: Partial<Quote> & { discountMode?: QuoteDiscountMode }, fallbackTaxRate = 0, fallbackPaymentFeeRate = 0, fallbackMargin = 0): Quote {
   const items = Array.isArray(raw.items) ? raw.items.map((item) => ({ id: item.id || `quote-item-${Date.now()}`, procedureId: item.procedureId || '', procedureName: String(item.procedureName || 'Procedimento'), quantity: Math.max(0, safeNumber(item.quantity, 1)), unitPrice: Math.max(0, safeNumber(item.unitPrice)), unitCost: Math.max(0, safeNumber(item.unitCost)), durationMinutes: Math.max(0, safeNumber(item.durationMinutes, 0)) })) : [];
+  const professionalItems = Array.isArray(raw.professionalItems) ? raw.professionalItems.map((item) => ({ id: item.id || `quote-professional-${Date.now()}`, professionalId: item.professionalId || '', professionalName: String(item.professionalName || 'Profissional parceiro'), area: String(item.area || '').trim(), service: String(item.service || '').trim(), amount: Math.max(0, safeNumber(item.amount)) })) : [];
   const discountMode = raw.discountMode === 'fixed' ? 'fixed' : 'percentual';
   const taxRate = Math.max(0, safeNumber(raw.taxRate, fallbackTaxRate));
   const paymentFeeRate = Math.max(0, safeNumber(raw.paymentFeeRate, fallbackPaymentFeeRate));
-  const totals = calculateQuoteTotals(items, raw.discount, discountMode, taxRate, paymentFeeRate);
+  const totals = calculateQuoteTotals(items, raw.discount, discountMode, taxRate, paymentFeeRate, professionalItems);
   const legacyTotal = safeNumber(raw.total, totals.total);
-  return { id: raw.id || `quote-${Date.now()}`, clientName: String(raw.clientName || '').trim(), items, discount: Math.max(0, safeNumber(raw.discount)), discountMode, discountAmount: Number.isFinite(raw.discountAmount) ? Math.max(0, safeNumber(raw.discountAmount)) : totals.discountAmount, subtotal: Number.isFinite(raw.subtotal) ? Math.max(0, safeNumber(raw.subtotal)) : totals.subtotal, total: Number.isFinite(raw.total) ? Math.max(0, legacyTotal) : totals.total, costTotal: Number.isFinite(raw.costTotal) ? Math.max(0, safeNumber(raw.costTotal)) : totals.costTotal, taxesAndFees: Number.isFinite(raw.taxesAndFees) ? Math.max(0, safeNumber(raw.taxesAndFees)) : totals.taxesAndFees, profit: Number.isFinite(raw.profit) ? safeNumber(raw.profit) : totals.profit, profitMargin: Number.isFinite(raw.profitMargin) ? safeNumber(raw.profitMargin) : totals.profitMargin, taxRate, paymentFeeRate, defaultMargin: Math.max(0, safeNumber(raw.defaultMargin, fallbackMargin)), createdAt: raw.createdAt || new Date().toISOString(), updatedAt: raw.updatedAt || raw.createdAt || new Date().toISOString() };
+  return { id: raw.id || `quote-${Date.now()}`, clientName: String(raw.clientName || '').trim(), items, professionalItems, discount: Math.max(0, safeNumber(raw.discount)), discountMode, discountAmount: Number.isFinite(raw.discountAmount) ? Math.max(0, safeNumber(raw.discountAmount)) : totals.discountAmount, subtotal: Number.isFinite(raw.subtotal) ? Math.max(0, safeNumber(raw.subtotal)) : totals.subtotal, total: Number.isFinite(raw.total) ? Math.max(0, legacyTotal) : totals.total, costTotal: Number.isFinite(raw.costTotal) ? Math.max(0, safeNumber(raw.costTotal)) : totals.costTotal, taxesAndFees: Number.isFinite(raw.taxesAndFees) ? Math.max(0, safeNumber(raw.taxesAndFees)) : totals.taxesAndFees, profit: Number.isFinite(raw.profit) ? safeNumber(raw.profit) : totals.profit, profitMargin: Number.isFinite(raw.profitMargin) ? safeNumber(raw.profitMargin) : totals.profitMargin, taxRate, paymentFeeRate, defaultMargin: Math.max(0, safeNumber(raw.defaultMargin, fallbackMargin)), createdAt: raw.createdAt || new Date().toISOString(), updatedAt: raw.updatedAt || raw.createdAt || new Date().toISOString() };
 }
 

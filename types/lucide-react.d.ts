@@ -29,6 +29,7 @@ declare module 'lucide-react' {
   export const Trash2: Icon;
   export const TrendingUp: Icon;
   export const UserRound: Icon;
+  export const Users: Icon;
   export const X: Icon;
 }
 

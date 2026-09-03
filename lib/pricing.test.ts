@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { calculateFinancialSummary, calculatePrice, calculateQuoteTotals, DEFAULT_BRANDING, DEFAULT_SETTINGS, normalizeFinancialEntry, normalizeMaterial, normalizeQuote, normalizeSettings, type FinancialEntry, type Material, type Procedure, type PricingSettings, type QuoteItem } from './pricing.ts';
+import { calculateFinancialSummary, calculatePrice, calculateQuoteTotals, DEFAULT_BRANDING, DEFAULT_SETTINGS, normalizeFinancialEntry, normalizeMaterial, normalizeOtherProfessional, normalizeQuote, normalizeSettings, type FinancialEntry, type Material, type Procedure, type PricingSettings, type QuoteItem } from './pricing.ts';
 
 const materials: Material[] = [
   normalizeMaterial({ id: 'resina', name: 'Resina', category: 'Restauração', unit: 'unidade', unitCost: 18.5, updatedAt: '2026-08-28T10:00:00.000Z' }),
@@ -88,5 +88,12 @@ test('normaliza entrada financeira inválida sem NaN ou Infinity', () => {
 });
 test('migra marca antiga persistida para FTG Odontologia', () => {
   assert.equal(normalizeSettings({ branding: { ...DEFAULT_BRANDING, appName: 'Precificação' } }).branding.appName, 'FTG Odontologia');
+});
+test('inclui participação de profissional parceiro no orçamento sem quebrar legado', () => {
+  const partner = normalizeOtherProfessional({ id: 'fono', name: 'Profissional', area: 'Fonoaudiologia', service: 'Avaliação', amount: 180 });
+  const quote = normalizeQuote({ id: 'with-partner', items: [{ id: 'item', procedureId: 'p', procedureName: 'Consulta', quantity: 1, unitPrice: 500, unitCost: 150 }], professionalItems: [{ id: 'partner-item', professionalId: partner.id, professionalName: partner.name, area: partner.area, service: partner.service, amount: partner.amount }] }, 6, 2, 30);
+  assert.equal(quote.subtotal, 680);
+  assert.equal(quote.costTotal, 330);
+  assert.equal(normalizeQuote({ id: 'legacy', items: [] }).professionalItems.length, 0);
 });
 
