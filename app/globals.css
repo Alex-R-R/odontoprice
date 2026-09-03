@@ -134,7 +134,7 @@
 .section-inline-heading { display: grid; gap: 4px; margin-bottom: 10px; }
 .section-inline-heading strong { color: var(--navy); font-size: 12px; }
 .section-inline-heading span { color: var(--muted-foreground); font-size: 10px; line-height: 1.4; }
-.professional-add-row { grid-template-columns: minmax(0, 1fr) auto; }
+.professional-add-row { grid-template-columns: minmax(150px, .9fr) minmax(180px, 1.2fr) 130px auto; }
 .professional-quote-item { grid-template-columns: minmax(0, 1fr) auto auto; }
 .desktop-professionals-table { display: block; }
 .mobile-professional-cards { display: none; }
@@ -143,4 +143,7 @@
 .professional-mobile-head strong { color: var(--navy); font-size: 12px; }
 .professional-mobile-head span { display: block; color: var(--muted-foreground); margin-top: 4px; }
 @media (max-width: 720px) { .desktop-professionals-table { display: none; } .mobile-professional-cards { display: grid; gap: 9px; padding: 0 12px 12px; } .professional-add-row { grid-template-columns: 1fr; } .professional-quote-item { grid-template-columns: minmax(0, 1fr) auto auto; } }
+.text-area { width: 100%; min-height: 90px; resize: vertical; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--foreground); padding: 9px 10px; font: inherit; font-size: 11px; outline: none; }
+.text-area:focus { border-color: var(--teal); box-shadow: 0 0 0 3px #1b8c7b1c; }
+.quote-print-note { color: #5e4a56; font-size: 11px; line-height: 1.5; margin: 18px 0 0; }
 

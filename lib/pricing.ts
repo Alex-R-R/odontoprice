@@ -8,9 +8,10 @@ export type PricingSettings = { monthlyFixedCosts: number; monthlyClinicalHours:
 export type HistoryEntry = { id: string; action: string; detail: string; createdAt: string };
 export type QuoteDiscountMode = 'percentual' | 'percent' | 'fixed';
 export type QuoteItem = { id: string; procedureId: string; procedureName: string; quantity: number; unitPrice: number; unitCost?: number; durationMinutes?: number };
-export type OtherProfessional = { id: string; name: string; area: string; service: string; amount: number; active: boolean; updatedAt: string };
+export type OtherProfessional = { id: string; name: string; area: string; active: boolean; updatedAt: string };
 export type QuoteProfessionalItem = { id: string; professionalId: string; professionalName: string; area: string; service: string; amount: number };
-export type Quote = { id: string; clientName: string; items: QuoteItem[]; professionalItems: QuoteProfessionalItem[]; discount: number; discountMode: QuoteDiscountMode; discountAmount: number; subtotal: number; total: number; costTotal: number; taxesAndFees: number; profit: number; profitMargin: number; taxRate: number; paymentFeeRate: number; defaultMargin: number; createdAt: string; updatedAt: string };
+export type QuoteInformation = { clinicName: string; dentistName: string; cro: string; phone: string; email: string; address: string; city: string; validityDays: number; paymentTerms: string; notes: string };
+export type Quote = { id: string; clientName: string; items: QuoteItem[]; professionalItems: QuoteProfessionalItem[]; documentInfo: QuoteInformation; discount: number; discountMode: QuoteDiscountMode; discountAmount: number; subtotal: number; total: number; costTotal: number; taxesAndFees: number; profit: number; profitMargin: number; taxRate: number; paymentFeeRate: number; defaultMargin: number; createdAt: string; updatedAt: string };
 export type QuoteTotals = { subtotal: number; professionalTotal: number; discountAmount: number; total: number; costTotal: number; taxesAndFees: number; profit: number; profitMargin: number; validDiscount: boolean };
 export type Calculation = { variableCost: number; fixedAllocation: number; realCost: number; minimumPrice: number; recommendedPrice: number; discountedPrice: number; taxesAndFees: number; profit: number; profitMargin: number; margin: number; taxRate: number; feeRate: number };
 export type FinancialEntry = { id: string; clientName: string; procedureName: string; date: string; amount: number; cost: number; notes: string };
@@ -19,6 +20,7 @@ export const MATERIAL_CATEGORIES = ['Anestésico', 'Descartável', 'Implantodont
 export const MATERIAL_UNITS = ['unidade', 'par', 'kit', 'caixa', 'ml', 'g', 'm', 'pote'];
 export const FIXED_COST_CATEGORIES = ['Estrutura', 'Pessoal', 'Tecnologia', 'Administrativo', 'Marketing', 'Outros'];
 export const DEFAULT_BRANDING: BrandingSettings = { appName: 'FTG Odontologia', subtitle: 'Gestão & Precificação Odontológica', clinicName: 'FTG Odontologia', dentistName: 'Dra. Fernanda T. Gonçalves', logoText: 'FTG', logoSymbol: '✦', primaryColor: '#bd587f', accentColor: '#edabc0' };
+export const DEFAULT_QUOTE_INFORMATION: QuoteInformation = { clinicName: 'FTG Odontologia', dentistName: 'Dra. Fernanda T. Gonçalves', cro: '', phone: '', email: '', address: '', city: '', validityDays: 15, paymentTerms: 'A combinar', notes: '' };
 export const DEFAULT_SETTINGS: PricingSettings = { monthlyFixedCosts: 0, monthlyClinicalHours: 120, taxRate: 6, paymentFeeRate: 2, defaultMargin: 30, fixedCosts: [], branding: DEFAULT_BRANDING, theme: 'light' };
 export const DEFAULT_MATERIALS: Material[] = [];
 export const DEFAULT_PROCEDURES: Procedure[] = [];
@@ -41,8 +43,12 @@ export function normalizeProcedure(raw: Partial<Procedure>): Procedure {
   return { id: raw.id || `procedure-${Date.now()}`, name: String(raw.name || '').trim(), category: raw.category || 'Outro', durationMinutes: Math.max(1, safeNumber(raw.durationMinutes, 1)), otherVariableCost: Math.max(0, safeNumber(raw.otherVariableCost, 0)), materials: Array.isArray(raw.materials) ? raw.materials.map((item) => ({ materialId: item.materialId, quantity: Math.max(0, safeNumber(item.quantity, 0)) })).filter((item) => item.materialId) : [], active: raw.active !== false };
 }
 
-export function normalizeOtherProfessional(raw: Partial<OtherProfessional>): OtherProfessional {
-  return { id: raw.id || `professional-${Date.now()}`, name: String(raw.name || '').trim(), area: String(raw.area || '').trim(), service: String(raw.service || '').trim(), amount: Math.max(0, safeNumber(raw.amount, 0)), active: raw.active !== false, updatedAt: raw.updatedAt || new Date().toISOString() };
+export function normalizeOtherProfessional(raw: Partial<OtherProfessional> & { service?: unknown; amount?: unknown }): OtherProfessional {
+  return { id: raw.id || `professional-${Date.now()}`, name: String(raw.name || '').trim(), area: String(raw.area || '').trim(), active: raw.active !== false, updatedAt: raw.updatedAt || new Date().toISOString() };
+}
+
+export function normalizeQuoteInformation(raw: Partial<QuoteInformation> = {}): QuoteInformation {
+  return { clinicName: String(raw.clinicName || DEFAULT_QUOTE_INFORMATION.clinicName).trim(), dentistName: String(raw.dentistName || DEFAULT_QUOTE_INFORMATION.dentistName).trim(), cro: String(raw.cro || '').trim(), phone: String(raw.phone || '').trim(), email: String(raw.email || '').trim(), address: String(raw.address || '').trim(), city: String(raw.city || '').trim(), validityDays: Math.max(1, Math.round(safeNumber(raw.validityDays, DEFAULT_QUOTE_INFORMATION.validityDays))), paymentTerms: String(raw.paymentTerms || DEFAULT_QUOTE_INFORMATION.paymentTerms).trim(), notes: String(raw.notes || '').trim() };
 }
 
 export function normalizeSettings(raw: Partial<PricingSettings> = {}): PricingSettings {
@@ -111,11 +117,12 @@ export function calculateFinancialSummary(entries: FinancialEntry[], start: stri
 export function normalizeQuote(raw: Partial<Quote> & { discountMode?: QuoteDiscountMode }, fallbackTaxRate = 0, fallbackPaymentFeeRate = 0, fallbackMargin = 0): Quote {
   const items = Array.isArray(raw.items) ? raw.items.map((item) => ({ id: item.id || `quote-item-${Date.now()}`, procedureId: item.procedureId || '', procedureName: String(item.procedureName || 'Procedimento'), quantity: Math.max(0, safeNumber(item.quantity, 1)), unitPrice: Math.max(0, safeNumber(item.unitPrice)), unitCost: Math.max(0, safeNumber(item.unitCost)), durationMinutes: Math.max(0, safeNumber(item.durationMinutes, 0)) })) : [];
   const professionalItems = Array.isArray(raw.professionalItems) ? raw.professionalItems.map((item) => ({ id: item.id || `quote-professional-${Date.now()}`, professionalId: item.professionalId || '', professionalName: String(item.professionalName || 'Profissional parceiro'), area: String(item.area || '').trim(), service: String(item.service || '').trim(), amount: Math.max(0, safeNumber(item.amount)) })) : [];
+  const documentInfo = normalizeQuoteInformation(raw.documentInfo);
   const discountMode = raw.discountMode === 'fixed' ? 'fixed' : 'percentual';
   const taxRate = Math.max(0, safeNumber(raw.taxRate, fallbackTaxRate));
   const paymentFeeRate = Math.max(0, safeNumber(raw.paymentFeeRate, fallbackPaymentFeeRate));
   const totals = calculateQuoteTotals(items, raw.discount, discountMode, taxRate, paymentFeeRate, professionalItems);
   const legacyTotal = safeNumber(raw.total, totals.total);
-  return { id: raw.id || `quote-${Date.now()}`, clientName: String(raw.clientName || '').trim(), items, professionalItems, discount: Math.max(0, safeNumber(raw.discount)), discountMode, discountAmount: Number.isFinite(raw.discountAmount) ? Math.max(0, safeNumber(raw.discountAmount)) : totals.discountAmount, subtotal: Number.isFinite(raw.subtotal) ? Math.max(0, safeNumber(raw.subtotal)) : totals.subtotal, total: Number.isFinite(raw.total) ? Math.max(0, legacyTotal) : totals.total, costTotal: Number.isFinite(raw.costTotal) ? Math.max(0, safeNumber(raw.costTotal)) : totals.costTotal, taxesAndFees: Number.isFinite(raw.taxesAndFees) ? Math.max(0, safeNumber(raw.taxesAndFees)) : totals.taxesAndFees, profit: Number.isFinite(raw.profit) ? safeNumber(raw.profit) : totals.profit, profitMargin: Number.isFinite(raw.profitMargin) ? safeNumber(raw.profitMargin) : totals.profitMargin, taxRate, paymentFeeRate, defaultMargin: Math.max(0, safeNumber(raw.defaultMargin, fallbackMargin)), createdAt: raw.createdAt || new Date().toISOString(), updatedAt: raw.updatedAt || raw.createdAt || new Date().toISOString() };
+  return { id: raw.id || `quote-${Date.now()}`, clientName: String(raw.clientName || '').trim(), items, professionalItems, documentInfo, discount: Math.max(0, safeNumber(raw.discount)), discountMode, discountAmount: Number.isFinite(raw.discountAmount) ? Math.max(0, safeNumber(raw.discountAmount)) : totals.discountAmount, subtotal: Number.isFinite(raw.subtotal) ? Math.max(0, safeNumber(raw.subtotal)) : totals.subtotal, total: Number.isFinite(raw.total) ? Math.max(0, legacyTotal) : totals.total, costTotal: Number.isFinite(raw.costTotal) ? Math.max(0, safeNumber(raw.costTotal)) : totals.costTotal, taxesAndFees: Number.isFinite(raw.taxesAndFees) ? Math.max(0, safeNumber(raw.taxesAndFees)) : totals.taxesAndFees, profit: Number.isFinite(raw.profit) ? safeNumber(raw.profit) : totals.profit, profitMargin: Number.isFinite(raw.profitMargin) ? safeNumber(raw.profitMargin) : totals.profitMargin, taxRate, paymentFeeRate, defaultMargin: Math.max(0, safeNumber(raw.defaultMargin, fallbackMargin)), createdAt: raw.createdAt || new Date().toISOString(), updatedAt: raw.updatedAt || raw.createdAt || new Date().toISOString() };
 }
 
