@@ -6,6 +6,7 @@ declare module 'lucide-react' {
   export const Ban: Icon;
   export const Calculator: Icon;
   export const Check: Icon;
+  export const ChevronLeft: Icon;
   export const ChevronRight: Icon;
   export const CircleDollarSign: Icon;
   export const Clock3: Icon;
